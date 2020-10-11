@@ -19,6 +19,8 @@ database.
        EPS_QoQ
        Insider_own
 
+NOTE: ***MUST EDIT FILE PATH BELOW FOR DATABASE AND CSV FILE DESTINATION***
+
 @author: HM
 """
 
@@ -199,6 +201,7 @@ df = df_format(metric_list, Stock.stocks)
 
 db_insert(df)
 
-file_path = r'C:\Users\Primary user\Documents\PyCharmProjects\Stock-Fundamentals-Database'
+# EDIT FILE PILE HERE
+file_path = "EDIT FILE PILE HERE"
 
 csv_file(metric_list, file_path)
