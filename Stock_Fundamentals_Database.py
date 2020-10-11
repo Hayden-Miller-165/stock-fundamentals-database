@@ -22,41 +22,77 @@ database.
 @author: HM
 """
 
-import pandas as pd, requests, time, datetime, contextlib, sqlite3, os
-from bs4 import BeautifulSoup
+import contextlib
+import datetime
+import os
+import pandas as pd
+import requests
+import sqlite3
+import time
+
 from sqlite3 import Error
+from bs4 import BeautifulSoup
+
+
+class Stock:
+    sectors = ['financials', 'consumer staples', 'consumer discretionary',
+               'utilities', 'basic materials', 'industrials', 'tech',
+               'telecom', 'healthcare', 'energy', 'real estate']
+    market_caps = ['small', 'mid', 'large']
+    types = ['growth', 'value']
+    stocks = []
+
+    def __init__(self, ticker, sector, market_cap, type_):
+        self.ticker = ticker.upper()
+        if sector.lower() in Stock.sectors:
+            self.sector = sector.title()
+        else:
+            raise ValueError('Not eligible sector: {}'.format(sector))
+        if market_cap.lower() in Stock.market_caps:
+            self.market_cap = market_cap.title()
+        else:
+            raise ValueError('Not eligible market cap: {}'.format(market_cap))
+        if type_.lower() in Stock.types:
+            self.type_ = type_.title()
+        else:
+            raise ValueError('Not eligible stock type: {}'.format(type_))
+
+        Stock.stocks.append(self)
+
 
 def fundamental_metric(soup, metric):
     return soup.find(text=metric).find_next(class_='snapshot-td2').text
 
-def get_fundamental_data(df, stock_list):
+
+def get_fundamental_data(dataframe, stock_list):
     for symbol in stock_list:
         try:
             header = {'User-Agent': 'my-app/0.0.1'}
             url = ("https://www.finviz.com/quote.ashx?t=" + symbol.ticker)
-            soup = BeautifulSoup(requests.get(url,headers=header)
-                .content, 'lxml') 
-            for column in df.columns:
+            soup = BeautifulSoup(requests.get(url, headers=header)
+                                 .content, 'lxml')
+            for column in dataframe.columns:
                 if column == 'Ticker':
-                    df.loc[symbol.ticker, column] = symbol.ticker
+                    dataframe.loc[symbol.ticker, column] = symbol.ticker
                 elif column == 'Sector':
-                    df.loc[symbol.ticker, column] = symbol.sector
+                    dataframe.loc[symbol.ticker, column] = symbol.sector
                 elif column == 'Market Cap':
-                    df.loc[symbol.ticker, column] = symbol.market_cap
+                    dataframe.loc[symbol.ticker, column] = symbol.market_cap
                 elif column == 'Type':
-                    df.loc[symbol.ticker, column] = symbol.type_
+                    dataframe.loc[symbol.ticker, column] = symbol.type_
                 elif column == 'Date':
-                    df.loc[symbol.ticker, column] = datetime.datetime.today(
-                            ).strftime('%Y-%m-%d')
+                    dataframe.loc[symbol.ticker, column] = datetime.datetime.today(
+                    ).strftime('%Y-%m-%d')
                 else:
-                    df.loc[symbol.ticker, column] = fundamental_metric(
-                            soup, column)
+                    dataframe.loc[symbol.ticker, column] = fundamental_metric(
+                        soup, column)
             time.sleep(5)
         except AttributeError:
             print(symbol.ticker, 'not found')
-    return df
+    return dataframe
 
-def db_insert(df):
+
+def db_insert(stock_data):
     try:
         with contextlib.closing(sqlite3.connect(
                 'Stock_Fundamentals_database.db')) as conn:
@@ -82,17 +118,14 @@ def db_insert(df):
                             Insider_own float,
                             UNIQUE(index_key)
                             )"""
-                            )
+                              )
                     conn.commit()
-                    
-                    for index, stock in df.iterrows():
-                        c.execute("INSERT OR REPLACE INTO Stock_fundamentals VALUES" +\
-                                  "(:index_key, :ticker, :sector," +\
-                                  ":market_cap, :type, :date, :PB, :PE," +\
-                                  ":Forward_PE, :PEG, :Debt_Eq, :EPS_ttm," +\
-                                  ":Dividend_pct, :ROE, :ROI, :EPS_QoQ," +\
-                                  ":Insider_own)", 
-                                  {'index_key': str(index), 
+
+                    for index, stock in stock_data.iterrows():
+                        c.execute("INSERT OR REPLACE INTO Stock_fundamentals VALUES ("
+                                  ":index_key, :ticker, :sector, :market_cap, :type, :date, :PB, :PE, :Forward_PE, "
+                                  ":PEG, :Debt_Eq, :EPS_ttm, :Dividend_pct, :ROE, :ROI, :EPS_QoQ, :Insider_own)",
+                                  {'index_key': str(index),
                                    'ticker': stock['Ticker'],
                                    'sector': stock['Sector'],
                                    'market_cap': stock['Market Cap'],
@@ -117,75 +150,55 @@ def db_insert(df):
         if conn:
             conn.close()
 
+
 def get_db_stocks():
     with contextlib.closing(sqlite3.connect(
             'Stock_Fundamentals_database.db')) as conn:
         with conn:
             with contextlib.closing(conn.cursor()) as c:
                 stocks = c.execute(
-                        "SELECT * FROM Stock_fundamentals").fetchall()
+                    "SELECT * FROM Stock_fundamentals").fetchall()
                 conn.commit()
                 return stocks
-            
+
+
 def df_format(columns_list, stock_list):
-    df = get_fundamental_data(pd.DataFrame(columns=columns_list), stock_list)
-    df.reset_index(drop=True, inplace=True)
-    df['Index'] = df['Ticker'] + ' ' + df['Date']
-    df.set_index('Index', inplace=True)
-    
-    for column in df.columns:
-        df[column] = df[column].str.replace('%', '')
-    return df
-       
-# Function to store data in CSV file as well     
-def csv_file(columns):
-    os.chdir('INSERT DATABASE PATH HERE')
-    
+    df_reformat = get_fundamental_data(pd.DataFrame(columns=columns_list), stock_list)
+    df_reformat.reset_index(drop=True, inplace=True)
+    df_reformat['Index'] = df_reformat['Ticker'] + ' ' + df_reformat['Date']
+    df_reformat.set_index('Index', inplace=True)
+
+    for column in df_reformat.columns:
+        df_reformat[column] = df_reformat[column].str.replace('%', '')
+    return df_reformat
+
+
+# Function to store data in CSV file as well
+def csv_file(columns, file_path):
+    os.chdir(file_path)
+
     csv_df = pd.DataFrame(get_db_stocks())
     csv_df.set_index(0, inplace=True)
     csv_df.columns = columns
     csv_df.to_csv('Stock_fundamentals.csv')
-            
-class stock:
-    sectors = ['financials', 'consumer staples', 'consumer discretionary', 
-               'utilities', 'basic materials', 'industrials', 'tech',
-               'telecom', 'healthcare', 'energy', 'real estate']
-    market_caps = ['small', 'mid', 'large']
-    types = ['growth', 'value']
-    stocks = []
-    
-    def __init__(self, ticker, sector, market_cap, type_):
-        self.ticker = ticker.upper()
-        if sector.lower() in stock.sectors:
-            self.sector = sector.title()
-        else:
-            raise ValueError('Not eligible sector: {}'.format(sector))
-        if market_cap.lower() in stock.market_caps:
-            self.market_cap = market_cap.title()
-        else:
-            raise ValueError('Not eligible market cap: {}'.format(market_cap))
-        if type_.lower() in stock.types:
-            self.type_ = type_.title()
-        else:
-            raise ValueError('Not eligible stock type: {}'.format(type_))
 
-        stock.stocks.append(self)
 
 # Add/remove stocks of interest below
-amzn = stock('amzn', 'consumer discretionary', 'large', 'growth')
-goog = stock('goog', 'telecom', 'large', 'growth')
-aapl = stock('aapl', 'tech', 'large', 'value')
-ally = stock('ally', 'financials', 'mid', 'value')
-brkb = stock('brk-b', 'financials', 'large', 'value')
+amzn = Stock('amzn', 'consumer discretionary', 'large', 'growth')
+goog = Stock('goog', 'telecom', 'large', 'growth')
+aapl = Stock('aapl', 'tech', 'large', 'value')
+ally = Stock('ally', 'financials', 'mid', 'value')
+brkb = Stock('brk-b', 'financials', 'large', 'value')
 
-metric_list = ['Ticker','Sector','Market Cap','Type','Date','P/B','P/E',
-          'Forward P/E','PEG','Debt/Eq','EPS (ttm)','Dividend %','ROE','ROI',
-          'EPS Q/Q','Insider Own']
+metric_list = ['Ticker', 'Sector', 'Market Cap', 'Type', 'Date', 'P/B', 'P/E', 'Forward P/E', 'PEG', 'Debt/Eq',
+               'EPS (ttm)', 'Dividend %', 'ROE', 'ROI', 'EPS Q/Q', 'Insider Own']
 
 print('Starting Stock Fundamentals Database program....')
 
-df = df_format(metric_list, stock.stocks)
+df = df_format(metric_list, Stock.stocks)
 
 db_insert(df)
 
-csv_file(metric_list)
+file_path = r'C:\Users\Primary user\Documents\PyCharmProjects\Stock-Fundamentals-Database'
+
+csv_file(metric_list, file_path)
