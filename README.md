@@ -1,5 +1,5 @@
 # Stock-Fundamentals-Database
-Pulls current stock fundamental ratios from Finviz and stores in a specifieddatabase.
+Pulls current stock fundamental ratios from Finviz and stores in a specified database.
     
     Ratios pulled from Finviz:
        Market_cap
@@ -16,10 +16,11 @@ Pulls current stock fundamental ratios from Finviz and stores in a specifieddata
        Insider_own
 
 
-Packages needed for program: pandas, requests, time, datetime, contextlib, sqlite3, os, BeautifulSoup, sqlite3
+*Requirements* 
+pandas, requests, time, datetime, contextlib, sqlite3, os, BeautifulSoup, sqlite3
 
 
--Required prep BEFORE running program-
-1. Specify desired stocks and fundamental ratios
-2. Insert file path for database and csv
-3. Rename database and/or csv file if desired
+*Required prep BEFORE running program*
+&nbsp;&nbsp;&nbsp;1. Specify desired stocks and fundamental ratios
+&nbsp;&nbsp;&nbsp;2. Insert file path for database and csv
+&nbsp;&nbsp;&nbsp;3. Rename database and/or csv file if desired
