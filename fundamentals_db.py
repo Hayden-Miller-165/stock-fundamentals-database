@@ -1,7 +1,5 @@
 #!python3
 """
-Created on Sun Aug 23 15:25:12 2020
-
 Pulls current stock fundamental ratios from Finviz and stores in a specified
 database.
 
@@ -21,7 +19,6 @@ database.
 
 NOTE: ***MUST EDIT FILE PATH BELOW FOR DATABASE AND CSV FILE DESTINATION***
 
-@author: HM
 """
 
 import contextlib
